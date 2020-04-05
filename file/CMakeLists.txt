@@ -10,15 +10,22 @@ endif()
 ########################################################################
 # File blocks module
 ########################################################################
+set(fileBlocksSources
+    BinaryFileSink.cpp
+    MemoryMappedBufferContainer.cpp
+    TextFileSink.cpp
+    TestBinaryFileBlocks.cpp
+)
+if(WIN32)
+    list(APPEND fileBlocksSources BinaryFileSourceOld.cpp)
+else()
+    list(APPEND fileBlocksSources BinaryFileSource.cpp)
+endif()
+
 include_directories(${JSON_HPP_INCLUDE_DIR})
 POTHOS_MODULE_UTIL(
     TARGET FileBlocks
-    SOURCES
-        BinaryFileSource.cpp
-        BinaryFileSink.cpp
-        MemoryMappedBufferContainer.cpp
-        TextFileSink.cpp
-        TestBinaryFileBlocks.cpp
+    SOURCES ${fileBlocksSources}
     DESTINATION blocks
     ENABLE_DOCS
 )
