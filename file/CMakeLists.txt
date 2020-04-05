@@ -16,6 +16,7 @@ POTHOS_MODULE_UTIL(
     SOURCES
         BinaryFileSource.cpp
         BinaryFileSink.cpp
+        MemoryMappedBufferContainer.cpp
         TextFileSink.cpp
         TestBinaryFileBlocks.cpp
     DESTINATION blocks
