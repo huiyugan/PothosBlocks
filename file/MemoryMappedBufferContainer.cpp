@@ -11,7 +11,7 @@
 
 static Poco::Logger& getLogger()
 {
-    static auto& logger = Poco::Logger::get("MemoryuMappedBufferContainer");
+    static auto& logger = Poco::Logger::get("MemoryMappedBufferContainer");
     return logger;
 }
 
