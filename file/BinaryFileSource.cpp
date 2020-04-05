@@ -1,5 +1,8 @@
 // Copyright (c) 2014-2016 Josh Blum
+//                    2020 Nicholas Corgan
 // SPDX-License-Identifier: BSL-1.0
+
+#include "MemoryMappedBufferContainer.hpp"
 
 #include <Pothos/Framework.hpp>
 
@@ -53,14 +56,17 @@
 class BinaryFileSource : public Pothos::Block
 {
 public:
-    static Block *make(const Pothos::DType &dtype)
+    static Block *make(const Pothos::DType& dtype)
     {
         return new BinaryFileSource(dtype);
     }
 
-    BinaryFileSource(const Pothos::DType &dtype):
-        _fd(-1),
-        _rewind(false)
+    BinaryFileSource(const Pothos::DType& dtype):
+        _mmapSharedBuff(Pothos::SharedBuffer::null()),
+        _rewind(false),
+        _offset(0),
+        _dtype(dtype),
+        _workedOnce(false)
     {
         this->setupOutput(0, dtype);
         this->registerCall(this, POTHOS_FCN_TUPLE(BinaryFileSource, setFilePath));
@@ -70,12 +76,8 @@ public:
     void setFilePath(const std::string &path)
     {
         _path = path;
-        //file was open -> close old fd, and open this new path
-        if (_fd != -1)
-        {
-            this->deactivate();
-            this->activate();
-        }
+        this->deactivate();
+        this->activate();
     }
 
     void setAutoRewind(const bool rewind)
@@ -85,54 +87,50 @@ public:
 
     void activate(void)
     {
-        if (_path.empty()) throw Pothos::FileException("BinaryFileSource", "empty file path");
-        _fd = open(_path.c_str(), O_RDONLY | O_BINARY);
-        if (_fd < 0)
-        {
-            poco_error_f4(Poco::Logger::get("BinaryFileSource"), "open(%s) returned %d -- %s(%d)", _path, _fd, std::string(strerror(errno)), errno);
-        }
+        // Validation performed here
+        auto containerSPtr = MemoryMappedBufferContainer::make(
+                                 _path,
+                                 true /*readable*/,
+                                 false /*writable*/);
+        _mmapSharedBuff = Pothos::SharedBuffer(
+                              reinterpret_cast<size_t>(containerSPtr->buffer()),
+                              containerSPtr->length(),
+                              containerSPtr);
     }
 
     void deactivate(void)
     {
-        close(_fd);
-        _fd = -1;
+        _mmapSharedBuff = Pothos::SharedBuffer::null();
     }
 
     void work(void)
     {
-        #ifdef _MSC_VER
-        //TODO use windows API to have timeout
-        #else
-        //setup timeval for timeout
-        timeval tv;
-        tv.tv_sec = 0;
-        tv.tv_usec = this->workInfo().maxTimeoutNs/1000; //ns->us
-
-        //setup rset for timeout
-        fd_set rset;
-        FD_ZERO(&rset);
-        FD_SET(_fd, &rset);
-
-        //call select with timeout
-        if (::select(_fd+1, &rset, NULL, NULL, &tv) <= 0) return this->yield();
-        #endif
-
-        auto out0 = this->output(0);
-        void *ptr = out0->buffer();
-        auto r = read(_fd, ptr, out0->buffer().length);
-        if (r == 0 and _rewind) lseek(_fd, 0, SEEK_SET);
-        if (r >= 0) out0->produce(size_t(r)/out0->dtype().size());
-        else
+        if(!_mmapSharedBuff)
         {
-            poco_error_f3(Poco::Logger::get("BinaryFileSource"), "read() returned %d -- %s(%d)", int(r), std::string(strerror(errno)), errno);
+            throw Pothos::RuntimeException("work() called with invalid file.");
         }
+
+        // We're posting, but only post when we'd theoretically be able to produce.
+        if(0 == this->workInfo().minElements) return;
+        if(!_rewind && _workedOnce) return;
+
+        auto bufferChunk = Pothos::BufferChunk(_mmapSharedBuff);
+        bufferChunk.dtype = _dtype;
+
+        this->output(0)->postBuffer(std::move(bufferChunk));
+
+        _workedOnce = true;
     }
 
 private:
-    int _fd;
     std::string _path;
+
+    Pothos::SharedBuffer _mmapSharedBuff;
     bool _rewind;
+    size_t _offset;
+
+    Pothos::DType _dtype;
+    bool _workedOnce;
 };
 
 static Pothos::BlockRegistry registerBinaryFileSource(

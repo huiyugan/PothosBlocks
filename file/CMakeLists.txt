@@ -12,14 +12,15 @@ endif()
 ########################################################################
 set(fileBlocksSources
     BinaryFileSink.cpp
-    MemoryMappedBufferContainer.cpp
     TextFileSink.cpp
     TestBinaryFileBlocks.cpp
 )
 if(WIN32)
     list(APPEND fileBlocksSources BinaryFileSourceOld.cpp)
 else()
-    list(APPEND fileBlocksSources BinaryFileSource.cpp)
+    list(APPEND fileBlocksSources
+        BinaryFileSource.cpp
+        MemoryMappedBufferContainer.cpp)
 endif()
 
 include_directories(${JSON_HPP_INCLUDE_DIR})

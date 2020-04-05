@@ -19,9 +19,6 @@ POTHOS_TEST_BLOCK("/blocks/tests", test_binary_file_blocks)
     std::cout << "tempFile " << tempFile.path() << std::endl;
     POTHOS_TEST_TRUE(tempFile.createFile());
 
-    auto fileSource = Pothos::BlockRegistry::make("/blocks/binary_file_source", "int");
-    fileSource.call("setFilePath", tempFile.path());
-
     auto fileSink = Pothos::BlockRegistry::make("/blocks/binary_file_sink");
     fileSink.call("setFilePath", tempFile.path());
 
@@ -41,6 +38,9 @@ POTHOS_TEST_BLOCK("/blocks/tests", test_binary_file_blocks)
         topology.commit();
         POTHOS_TEST_TRUE(topology.waitInactive());
     }
+
+    auto fileSource = Pothos::BlockRegistry::make("/blocks/binary_file_source", "int");
+    fileSource.call("setFilePath", tempFile.path());
 
     //run a topology that sends file to collector
     {

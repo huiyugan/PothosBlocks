@@ -61,6 +61,10 @@ public:
         constexpr int mmapFlags = MAP_SHARED;
 
         _length = Poco::File(filepath).getSize();
+        if(0 == _length)
+        {
+            throw Pothos::InvalidArgumentException("Empty files not supported.");
+        }
 
         int fd = 0;
         throwErrnoOnFailure<Pothos::OpenFileException>(
@@ -68,7 +72,7 @@ public:
             "open");
 
         _buffer = ::mmap(nullptr, _length, mmapProt, mmapFlags, fd, 0);
-        if(!_buffer || (((void*)(-1)) == _buffer))
+        if(!_buffer || (MAP_FAILED == _buffer))
         {
             throw Pothos::IOException("mmap", ::strerror(errno));
         }
